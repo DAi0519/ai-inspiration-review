@@ -1,0 +1,426 @@
+<!doctype html>
+<!--
+[INPUT]: 构建器嵌入的案例清单与 assets/ 里的原图。
+[OUTPUT]: 可按分类和图片覆盖筛选的离线输入输出审查页。
+[POS]: UPMS 生图案例审查的 HTML 模板，由 build_gallery.py 注入任务数据。
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生图案例审查 · AI 灵感</title>
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f6f5f1;
+  --surface: #fff;
+  --ink: #1e2927;
+  --quiet: #52615d;
+  --line: #d9ded7;
+  --accent: #20594d;
+  --accent-wash: #e5f0ec;
+  --stage: #e8e9e4;
+  --radius: 15px;
+  font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); }
+body:has(dialog[open]) { overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button, select { cursor: pointer; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid #367666; outline-offset: 3px; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1512px; width: 100%; margin-inline: auto; padding-inline: clamp(16px, 4.2vw, 64px); }
+.masthead { padding-block: clamp(34px, 5vw, 75px) 26px; }
+.kicker { margin: 0 0 14px; color: var(--accent); font-size: .78rem; font-weight: 730; letter-spacing: .12em; }
+h1 { margin: 0; font-size: clamp(2.1rem, 4.3vw, 4rem); line-height: 1.13; font-weight: 720; letter-spacing: -.045em; }
+.lead { max-width: 42rem; margin: 15px 0 0; color: var(--quiet); font-size: 1rem; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: clamp(26px, 4vw, 47px) 0 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--line);
+}
+.stats > div { display: flex; flex-direction: column-reverse; background: var(--surface); padding: clamp(12px, 2.3vw, 24px); }
+.stats dt { color: var(--quiet); font-size: .82rem; }
+.stats dd { margin: 0; font-size: clamp(1.6rem, 3vw, 2.65rem); line-height: 1.17; font-variant-numeric: tabular-nums; }
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 11px;
+  padding-block: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.field { display: grid; gap: 6px; color: var(--quiet); font-size: .82rem; font-weight: 650; }
+.field input, .field select { width: 100%; min-height: 44px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font-size: .92rem; font-weight: 450; }
+.field input::placeholder { color: #66746f; }
+.category { grid-column: 1 / -1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 5px 11px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: .84rem;
+}
+.chips button[aria-pressed="true"] { color: #fff; border-color: var(--accent); background: var(--accent); }
+.chip-count { font-size: .72rem; font-variant-numeric: tabular-nums; opacity: .8; }
+.chips button:hover:not([aria-pressed="true"]) { border-color: var(--accent); background: var(--accent-wash); }
+.results { margin: 13px 0 19px; color: var(--quiet); font-size: .86rem; }
+.cases { display: grid; gap: 20px; padding-bottom: 70px; }
+.case { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); scroll-margin-top: 16px; }
+.case:target { border-color: var(--accent); }
+.case-head { display: flex; gap: 13px; align-items: baseline; padding: clamp(13px, 2vw, 24px) clamp(12px, 2.1vw, 29px) 12px; }
+.case-index { color: var(--accent); font-size: .83rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.case h2 { margin: 0; font-size: clamp(1.12rem, 2vw, 1.65rem); line-height: 1.28; overflow-wrap: anywhere; }
+.case-category { margin-left: auto; padding: 3px 9px; border-radius: 15px; color: var(--accent); background: var(--accent-wash); white-space: nowrap; font-size: .76rem; font-weight: 690; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 0 clamp(12px, 2.1vw, 29px); }
+.panel { min-width: 0; }
+.panel-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-height: 29px; }
+.panel h3 { margin: 0; font-size: .88rem; }
+.panel-count { color: var(--quiet); font-size: .75rem; }
+.panel-note { margin: 7px 0 0; color: var(--quiet); font-size: .78rem; }
+.images { display: grid; gap: 9px; }
+.images:empty { display: none; }
+figure { margin: 0; min-width: 0; }
+.photo {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--stage);
+  cursor: zoom-in;
+}
+.photo:hover { border-color: var(--accent); }
+.photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.photo[data-panorama="true"] { aspect-ratio: 2 / 1; }
+.photo:disabled { cursor: default; color: var(--quiet); }
+figure figcaption { min-height: 0; margin-top: 4px; color: var(--quiet); font-size: .75rem; overflow-wrap: anywhere; }
+figure figcaption:empty { display: none; }
+.empty-image {
+  display: grid;
+  place-items: center;
+  min-height: 122px;
+  padding: 15px;
+  border: 1px dashed #c6cdc6;
+  border-radius: 10px;
+  color: var(--quiet);
+  background: var(--paper);
+  font-size: .84rem;
+  text-align: center;
+}
+.case-foot {
+  margin: 17px clamp(12px, 2.1vw, 29px) 0;
+  padding: 11px 0 14px;
+  border-top: 1px solid var(--line);
+}
+.case-meta { display: flex; flex-wrap: wrap; gap: 3px 12px; color: var(--quiet); font-size: .75rem; overflow-wrap: anywhere; }
+.case-meta span { min-width: 0; }
+.case-meta a { text-underline-offset: 3px; }
+.case details { margin-top: 9px; font-size: .8rem; color: var(--quiet); }
+.case details summary { cursor: pointer; color: var(--accent); font-weight: 650; }
+.prompt { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.no-results { padding: 24px; margin: 0 0 42px; border: 1px dashed #c6cdc6; border-radius: var(--radius); color: var(--quiet); }
+dialog {
+  width: min(1320px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid #65756f;
+  border-radius: var(--radius);
+  color: #f5f7f5;
+  background: #1b2421;
+}
+dialog::backdrop { background: rgb(14 19 17 / .82); }
+.viewer-head, .viewer-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 12px; padding: 10px 14px; }
+.viewer-head { justify-content: space-between; }
+.viewer-head h2 { margin: 0; font-size: .98rem; }
+.viewer-stage { display: grid; min-height: 140px; place-items: center; margin: 0; padding: 6px 12px; background: #121917; }
+.viewer-stage img { display: block; width: auto; max-width: 100%; max-height: calc(100dvh - 160px); object-fit: contain; }
+.viewer-caption { color: #d4ded8; font-size: .82rem; }
+.viewer-controls .original { margin-left: auto; color: #cce8db; text-underline-offset: 3px; }
+.viewer-button { min-height: 42px; padding: 4px 11px; border: 1px solid #677870; border-radius: 8px; color: inherit; background: #24322d; }
+.viewer-button:hover:not(:disabled) { background: #355044; }
+.viewer-button:disabled { opacity: .46; cursor: default; }
+@media (max-width: 650px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .case-head { gap: 8px; }
+  .case-category { white-space: normal; flex: 0 0 auto; max-width: 6.5em; }
+}
+@media print {
+  .toolbar, dialog, .results { display: none; }
+  .wrap { max-width: none; padding-inline: 0; }
+  .case { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<header class="masthead wrap">
+  <p class="kicker">AI 灵感 / 素材审查</p>
+  <h1>生图案例审查</h1>
+  <p class="lead">按任务查看输入图和输出图。点击图片放大，也可单独打开原图。</p>
+  <dl class="stats" aria-label="全部案例的图片覆盖">
+    <div><dt>案例总数</dt><dd id="stat-total">—</dd></div>
+    <div><dt>有输入图的案例</dt><dd id="stat-inputs">—</dd></div>
+    <div><dt>有输出图的案例</dt><dd id="stat-outputs">—</dd></div>
+    <div><dt>输入和输出都有图</dt><dd id="stat-paired">—</dd></div>
+  </dl>
+</header>
+<main class="wrap">
+  <form class="toolbar" aria-label="筛选案例">
+    <label class="field"><span>搜索</span><input id="search" type="search" placeholder="输入标题、分类或案例编号" autocomplete="off"></label>
+    <label class="field"><span>图片覆盖</span><select id="coverage">
+      <option value="any">全部案例</option>
+      <option value="paired">输入和输出都有图</option>
+      <option value="unpaired">至少一侧没有图</option>
+    </select></label>
+    <div class="category">
+      <ul class="chips" id="categories" aria-label="案例分类"></ul>
+    </div>
+  </form>
+  <p id="results" class="results" role="status"></p>
+  <section id="cases" class="cases" aria-label="案例列表"></section>
+  <p id="no-results" class="no-results" hidden>没有符合当前筛选条件的案例。</p>
+  <noscript><p class="no-results">开启 JavaScript 后即可查看案例列表和图片。</p></noscript>
+</main>
+<template id="case-template">
+  <article class="case">
+    <header class="case-head"><span class="case-index"></span><h2></h2><span class="case-category"></span></header>
+    <div class="pair"></div>
+    <footer class="case-foot"><div class="case-meta"></div></footer>
+  </article>
+</template>
+<template id="panel-template">
+  <section class="panel">
+    <header class="panel-head"><h3></h3><span class="panel-count"></span></header>
+    <div class="images"></div><div class="empty-image" hidden></div>
+    <p class="panel-note" hidden></p>
+  </section>
+</template>
+<dialog id="viewer" aria-labelledby="viewer-title">
+  <header class="viewer-head">
+    <h2 id="viewer-title"></h2>
+    <button class="viewer-button" id="viewer-close" type="button" autofocus>关闭</button>
+  </header>
+  <div class="viewer-stage"><img id="viewer-image" alt=""><p id="viewer-error" hidden>无法打开图片文件。</p></div>
+  <footer class="viewer-controls">
+    <button class="viewer-button" id="viewer-prev" type="button">上一张</button>
+    <button class="viewer-button" id="viewer-next" type="button">下一张</button>
+    <span id="viewer-caption" class="viewer-caption" aria-live="polite"></span>
+    <a id="viewer-original" class="original" target="_blank" rel="noopener">查看原图 ↗</a>
+  </footer>
+</dialog>
+<script type="application/json" id="case-data">{"cases":[{"row_index":1,"category":"毛坯设计","title":"奶油风客厅","inputs":[{"src":"assets/437c22df331326d2fc0e9a6b.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/94fb50bbaaf75fedf41c20ba.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":2,"category":"毛坯设计","title":"奶油风客厅","inputs":[{"src":"assets/0d829aa94ebe478127b80538.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/d8837c0062cc1b00407fb388.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":3,"category":"毛坯设计","title":"奶油风客厅","inputs":[{"src":"assets/929b95a6c943b9604a65ef19.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/7f0096757d1c71fd53f5f145.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":4,"category":"毛坯设计","title":"北欧风卧室","inputs":[{"src":"assets/0d829aa94ebe478127b80538.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/f15dfde80155bb854f08d91c.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":5,"category":"毛坯设计","title":"现代简约卧室","inputs":[{"src":"assets/e5c8643d66b517ce5d3c97ea.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/5e3e9f5dd0e6c5f4323de723.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":6,"category":"毛坯设计","title":"中古风客厅","inputs":[{"src":"assets/f4b8803173fc7451f9ef46d8.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/1eb4ff07f960b9d0affeb7c2.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":7,"category":"毛坯设计","title":"新中式卧室","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/62300780c6282f6de35f1fb9.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":8,"category":"毛坯设计","title":"包豪斯儿童房","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/78dd94527f0ce6d4b0276b6d.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":9,"category":"毛坯设计","title":"侘寂风书房","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/4b3bd356e3dc3c910610927e.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":10,"category":"毛坯设计","title":"美式风格卧室","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/8cf096f0703376af8b45373c.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":11,"category":"毛坯设计","title":"欧式风格儿童房","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/0452f6f73b5ff7aabb908c91.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":12,"category":"毛坯设计","title":"日式风格","inputs":[{"src":"assets/caf307f9f001fe0e1912bf54.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/40ad3e8edbb6cce31b72af09.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":13,"category":"旧房改造","title":"北欧风格书房","inputs":[{"src":"assets/0e3d15eb28c3825282bade0a.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/6a842887460cf9ec425a372e.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":14,"category":"旧房改造","title":"北欧风格客厅","inputs":[{"src":"assets/0e3d15eb28c3825282bade0a.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/e1227f25662c344417d11f5c.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":15,"category":"旧房改造","title":"中古风餐厅","inputs":[{"src":"assets/0e3d15eb28c3825282bade0a.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/875ccbff0f1deb53e0e6a8f6.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":16,"category":"旧房改造","title":"欧式风格餐厅","inputs":[{"src":"assets/86fd1e416fa29e998a19e5e1.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/cf0ec6d09747e170cd854141.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":17,"category":"旧房改造","title":"现代简约风客厅","inputs":[{"src":"assets/86fd1e416fa29e998a19e5e1.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/a3adb29d24f1130674ac4eff.png","label":"","panorama":false},{"src":"assets/7a8770a8b98b74d4f3d1901d.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":18,"category":"全景图","title":"电影柔光","inputs":[],"outputs":[],"input_status":"暂缺原图","output_status":"暂缺原图"},{"row_index":19,"category":"全景图","title":"斜阳长影","inputs":[{"src":"assets/d2a54177f4dc2ae7c393c4ed.jpg","label":"","panorama":true}],"outputs":[{"src":"assets/9d638a0bd0f88c57f14ce486.png","label":"","panorama":true}],"input_status":"","output_status":""},{"row_index":20,"category":"全景图","title":"晴窗树影","inputs":[{"src":"assets/d2a54177f4dc2ae7c393c4ed.jpg","label":"","panorama":true}],"outputs":[{"src":"assets/cb692a06a47469f0b2201465.png","label":"","panorama":true}],"input_status":"","output_status":""},{"row_index":21,"category":"全景图","title":"金色夕阳","inputs":[{"src":"assets/a15fa73dafdb222c9b1feaa3.jpg","label":"","panorama":true}],"outputs":[{"src":"assets/3f431964501bb3f3630435a9.png","label":"","panorama":true},{"src":"assets/fc71707bd62d5361f39fc200.png","label":"","panorama":true}],"input_status":"","output_status":""},{"row_index":22,"category":"全景图","title":"日光暖灯","inputs":[],"outputs":[],"input_status":"暂缺原图","output_status":"暂缺原图"},{"row_index":23,"category":"绘图创作","title":"奶油风格","inputs":[{"src":"assets/1cea64e95e3f90df86be284a.png","label":"","panorama":false}],"outputs":[{"src":"assets/6e888bd3398052a5a9c8df8e.png","label":"","panorama":false},{"src":"assets/868e3760d8d2b0e0ef57e00b.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":24,"category":"绘图创作","title":"中古风格","inputs":[{"src":"assets/be6846a31ff50bf52cae2ffb.jpg","label":"","panorama":true}],"outputs":[{"src":"assets/d4f22d35fb8ee81a518c1316.png","label":"","panorama":true},{"src":"assets/97e4c634968dcaf85f2ef6c3.png","label":"","panorama":true}],"input_status":"","output_status":""},{"row_index":25,"category":"模型渲染","title":"电影柔光室内渲染","inputs":[{"src":"assets/823466e0c5c73da6d26204e0.png","label":"","panorama":false}],"outputs":[{"src":"assets/7ae5e66302fa9aeed71435d9.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":26,"category":"模型渲染","title":"斜阳长影室内渲染","inputs":[{"src":"assets/55d6349d84833b0ee30ab102.png","label":"","panorama":false}],"outputs":[{"src":"assets/db8667467a7a8a0d43635ece.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":27,"category":"模型渲染","title":"黄昏卧室渲染","inputs":[{"src":"assets/ea8c8e4ffb8c4f68aead104b.png","label":"","panorama":false}],"outputs":[{"src":"assets/858d3215f5f5572a306d397e.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":28,"category":"模型渲染","title":"冷调日光客厅效果","inputs":[{"src":"assets/d3ccbb3a7a4661140a515246.png","label":"","panorama":false}],"outputs":[{"src":"assets/78e7b488c2445042d11fd002.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":29,"category":"模型渲染","title":"日光暖灯卧室","inputs":[{"src":"assets/e537ce0bdd429ac296c947f4.png","label":"","panorama":false}],"outputs":[{"src":"assets/141f9a1136f5f2ab99f075c0.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":30,"category":"效果图美化","title":"明亮自然效果","inputs":[{"src":"assets/a6ed62c637402e84ae07adf4.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/819b2756d2bd5bf94c796d37.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":31,"category":"天气转换","title":"一键夜景","inputs":[{"src":"assets/ffabc67f860569217ad71d2b.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/495c3a3a970944fb2ec30526.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":32,"category":"天气转换","title":"一键雾天","inputs":[{"src":"assets/4d848870f674f8f52c08f0ea.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/2663d64998398af2c5c665de.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":33,"category":"天气转换","title":"一键雨天","inputs":[{"src":"assets/c6940c1d0961900e3ecfb24d.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/929ae8cb4d7261e8f356ff05.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":34,"category":"家具替换","title":"灯具替换","inputs":[{"src":"assets/2a9ecee2055d873063bdc8d8.png","label":"","panorama":false},{"src":"assets/501ce990a947a0d350870c22.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/bc2a45669e17002ba3386d78.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":35,"category":"材质替换","title":"座椅转皮质","inputs":[{"src":"assets/c61244ad8fff5d38d62296a0.jpg","label":"","panorama":false},{"src":"assets/ead6fd5dddb90a0de4225515.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/5ef21880c1ce8ca0ff1b273f.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":36,"category":"家具替换","title":"换沙发","inputs":[{"src":"assets/0cf673d6d18b1d546b4c3ec9.png","label":"","panorama":false},{"src":"assets/ead6fd5dddb90a0de4225515.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/9cb70ed463d024451d621c40.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":37,"category":"局部消除","title":"消除装饰物品","inputs":[{"src":"assets/5ef21880c1ce8ca0ff1b273f.png","label":"","panorama":false}],"outputs":[{"src":"assets/dc1d02792a31b346d48bb3e7.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":38,"category":"风格转换","title":"中古风改造","inputs":[{"src":"assets/6ea77c03fd82bd5fc1ec62ee.webp","label":"","panorama":false}],"outputs":[{"src":"assets/5f20fda918077875849e3b8e.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":39,"category":"风格转换","title":"简约风改造","inputs":[{"src":"assets/baf73cad703505b53ba8f2a2.webp","label":"","panorama":false}],"outputs":[{"src":"assets/9a452b2ed91fdee084243051.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":40,"category":"风格转换","title":"新中式改造","inputs":[{"src":"assets/bbe53d3e5c85db494f352377.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/9d4d3fa69238ee258501f2ee.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":41,"category":"天气转换","title":"一键黄昏","inputs":[{"src":"assets/63a21782ed0573b7217da3b1.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/8ce8fbd400b4fb3d0277f87e.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":42,"category":"天气转换","title":"一键晴天","inputs":[{"src":"assets/70ffc643cd08b5893b3da86f.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/dc33530d268067c426ea71ab.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":43,"category":"绘图创作","title":"新中式风格渲染","inputs":[{"src":"assets/28e6ee6ffdb3168e8233581d.png","label":"","panorama":false}],"outputs":[{"src":"assets/758d07d37a8ece38698ecfb8.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":44,"category":"绘图创作","title":"北欧风格渲染","inputs":[{"src":"assets/721879a414f80e4ae10da429.png","label":"","panorama":false},{"src":"assets/b0cc01813003f11eda502487.png","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/c364a16383ef90a3a66a0d93.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":45,"category":"绘图创作","title":"简约风格渲染","inputs":[{"src":"assets/1941a579f146c83bfd3d8d93.png","label":"","panorama":false},{"src":"assets/b7384e5ee52c5d440f3e29cb.webp","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/31cca930314e2f8a455be7f9.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":46,"category":"绘图创作","title":"包豪斯风格渲染","inputs":[{"src":"assets/b9dc08846675a66bb65ef657.png","label":"","panorama":false},{"src":"assets/bc776b97f68f5db53d4110dd.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/3d333911ebe8d6622b1eb405.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":47,"category":"绘图创作","title":"意式风格渲染","inputs":[{"src":"assets/196ef08e9fbf33d6e7b05b7a.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/37a054592fb5cfdb40d7861f.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":48,"category":"绘图创作","title":"日式风格渲染","inputs":[{"src":"assets/85065a049dce789354303966.jpg","label":"","panorama":false}],"outputs":[{"src":"assets/db9f95783f55225107ce1945.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":49,"category":"绘图创作","title":"自然风格客厅","inputs":[{"src":"assets/f22984fd9c9a4d3d07057838.jpg","label":"","panorama":false},{"src":"assets/c61244ad8fff5d38d62296a0.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/0a45dc60aa72902e0254c028.png","label":"","panorama":false}],"input_status":"","output_status":""},{"row_index":50,"category":"绘图创作","title":"自然原木风渲染","inputs":[{"src":"assets/6617d9cef2f37a9cafa16801.jpg","label":"","panorama":false},{"src":"assets/4395b9105e60dfd7e381e833.jpg","label":"原任务参考图","panorama":false}],"outputs":[{"src":"assets/c8148a7813c6141654e8ff50.png","label":"","panorama":false}],"input_status":"","output_status":""}]}</script>
+<script>
+"use strict";
+const byId = (id) => document.getElementById(id);
+const manifestText = byId("case-data").textContent;
+const { cases } = JSON.parse(manifestText);
+const filters = { category: "", query: "", coverage: "any" };
+const categoryCounts = new Map();
+const chips = new Map();
+const cards = [];
+const viewer = byId("viewer");
+let viewerState;
+
+function filled(caseItem) {
+  return caseItem.inputs.length > 0 && caseItem.outputs.length > 0;
+}
+
+function textElement(tag, text) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  return element;
+}
+
+function addChip(category, label, count) {
+  const button = textElement("button", label);
+  button.type = "button";
+  button.setAttribute("aria-pressed", String(!category));
+  const total = textElement("span", count);
+  total.className = "chip-count";
+  button.append(total);
+  const listItem = document.createElement("li");
+  listItem.append(button);
+  byId("categories").append(listItem);
+  chips.set(category, button);
+  button.addEventListener("click", () => {
+    filters.category = category;
+    updateFilters();
+  });
+}
+
+function updateFilters() {
+  let shown = 0;
+  for (const card of cards) {
+    const categoryMatch = !filters.category || card.data.category === filters.category;
+    const queryMatch = !filters.query || card.search.includes(filters.query);
+    const coverageMatch = filters.coverage === "any" || (filters.coverage === "paired") === filled(card.data);
+    card.element.hidden = !(categoryMatch && queryMatch && coverageMatch);
+    if (!card.element.hidden) shown += 1;
+  }
+  for (const [category, chip] of chips) {
+    chip.setAttribute("aria-pressed", String(category === filters.category));
+  }
+  byId("results").textContent = "当前显示 " + shown + " / " + cases.length + " 条";
+  byId("no-results").hidden = shown > 0;
+}
+
+function updateViewer() {
+  const { title, photos, index } = viewerState;
+  const item = photos[index];
+  const caption = [item.side, item.label, item.panorama ? "全景图" : ""].filter(Boolean).join(" · ");
+  byId("viewer-title").textContent = title;
+  byId("viewer-error").hidden = true;
+  const image = byId("viewer-image");
+  image.hidden = false;
+  image.alt = title + " · " + caption;
+  image.src = item.src;
+  byId("viewer-original").href = item.src;
+  byId("viewer-caption").textContent = (index + 1) + " / " + photos.length + " · " + caption;
+  byId("viewer-prev").disabled = index === 0;
+  byId("viewer-next").disabled = index >= photos.length - 1;
+}
+
+function openViewer(title, photos, index, button) {
+  viewerState = { title, photos, index, button };
+  updateViewer();
+  viewer.showModal();
+}
+
+function stepViewer(offset) {
+  if (!viewerState) return;
+  const next = viewerState.index + offset;
+  if (next < 0 || next >= viewerState.photos.length) return;
+  viewerState.index = next;
+  updateViewer();
+}
+
+function makePanel(caseItem, side, photos, allPhotos, offset, note) {
+  const panel = byId("panel-template").content.firstElementChild.cloneNode(true);
+  panel.querySelector("h3").textContent = side;
+  panel.querySelector(".panel-count").textContent = photos.length + " 张";
+  if (photos.length === 0) {
+    const empty = panel.querySelector(".empty-image");
+    empty.hidden = false;
+    empty.textContent = note || "暂未取得" + side;
+    return panel;
+  }
+  for (const [index, item] of photos.entries()) {
+    const figure = document.createElement("figure");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "photo";
+    button.dataset.panorama = String(item.panorama);
+    const description = item.label || side + " " + (index + 1);
+    button.setAttribute("aria-label", "放大查看 " + caseItem.title + " · " + description);
+    const image = document.createElement("img");
+    image.alt = caseItem.title + " · " + description;
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", () => {
+      button.disabled = true;
+      button.textContent = "图片文件无法读取";
+    });
+    image.src = item.src;
+    button.append(image);
+    button.addEventListener("click", () => openViewer(caseItem.title, allPhotos, offset + index, button));
+    const label = [item.label, item.panorama ? "全景图" : ""].filter(Boolean).join(" · ");
+    figure.append(button, textElement("figcaption", label));
+    panel.querySelector(".images").append(figure);
+  }
+  if (note) {
+    const status = panel.querySelector(".panel-note");
+    status.hidden = false;
+    status.textContent = note;
+  }
+  return panel;
+}
+
+function makeCard(caseItem, index) {
+  const element = byId("case-template").content.firstElementChild.cloneNode(true);
+  element.id = "case-" + caseItem.row_index;
+  element.querySelector(".case-index").textContent = String(index + 1).padStart(2, "0");
+  element.querySelector("h2").textContent = caseItem.title;
+  element.querySelector(".case-category").textContent = caseItem.category;
+  const photos = [
+    ...caseItem.inputs.map((item) => ({ ...item, side: "输入图" })),
+    ...caseItem.outputs.map((item) => ({ ...item, side: "输出图" })),
+  ];
+  element.querySelector(".pair").append(
+    makePanel(caseItem, "输入图", caseItem.inputs, photos, 0, caseItem.input_status),
+    makePanel(caseItem, "输出图", caseItem.outputs, photos, caseItem.inputs.length, caseItem.output_status)
+  );
+  const anchor = textElement("a", "案例 " + String(caseItem.row_index).padStart(2, "0"));
+  anchor.href = "#" + element.id;
+  const meta = element.querySelector(".case-meta");
+  meta.append(anchor);
+  return element;
+}
+
+byId("stat-total").textContent = cases.length;
+byId("stat-inputs").textContent = cases.filter((item) => item.inputs.length > 0).length;
+byId("stat-outputs").textContent = cases.filter((item) => item.outputs.length > 0).length;
+byId("stat-paired").textContent = cases.filter(filled).length;
+const fragment = document.createDocumentFragment();
+for (const [index, caseItem] of cases.entries()) {
+  categoryCounts.set(caseItem.category, (categoryCounts.get(caseItem.category) || 0) + 1);
+  const element = makeCard(caseItem, index);
+  const search = [caseItem.title, caseItem.category, String(caseItem.row_index)].join(" ").toLowerCase();
+  cards.push({ data: caseItem, element, search });
+  fragment.append(element);
+}
+byId("cases").append(fragment);
+addChip("", "全部", cases.length);
+for (const [category, count] of categoryCounts) addChip(category, category, count);
+
+document.querySelector(".toolbar").addEventListener("submit", (event) => event.preventDefault());
+byId("search").addEventListener("input", (event) => {
+  filters.query = event.target.value.trim().toLowerCase();
+  updateFilters();
+});
+byId("coverage").addEventListener("change", (event) => {
+  filters.coverage = event.target.value;
+  updateFilters();
+});
+byId("viewer-close").addEventListener("click", () => viewer.close());
+byId("viewer-prev").addEventListener("click", () => stepViewer(-1));
+byId("viewer-next").addEventListener("click", () => stepViewer(1));
+byId("viewer-image").addEventListener("error", (event) => {
+  event.target.hidden = true;
+  byId("viewer-error").hidden = false;
+});
+viewer.addEventListener("click", (event) => {
+  if (event.target === viewer) viewer.close();
+});
+viewer.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft") stepViewer(-1);
+  if (event.key === "ArrowRight") stepViewer(1);
+});
+viewer.addEventListener("close", () => {
+  byId("viewer-image").removeAttribute("src");
+  viewerState?.button.focus();
+  viewerState = undefined;
+});
+updateFilters();
+if (location.hash) byId(location.hash.slice(1))?.scrollIntoView();
+</script>
+</body>
+</html>
